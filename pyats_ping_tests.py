@@ -52,22 +52,22 @@ class PING_Public_IPs(aetest.Testcase):
         if self.device.os == "iosxe":
             interface_list = self.device.parse("show ip interface brief")
             for interface,value in interface_list['interface'].items():
-                if "172.16.252" in value['ip_address']:
+                try:
                     parsed_ping = self.device.parse(f"ping 1.1.1.1 source { interface } repeat { number_of_pings }")
                     self.ping_1_1_1_1_results[self.device.alias][interface] = parsed_ping
+                except:
+                    log.info(f"The interface { interface } cannot ping 1.1.1.1")
         elif self.device.os == "nxos":
             interface_list = self.device.parse("show ip interface brief")
             for interface,value in interface_list['interface'].items():
                 if 'Vlan' in interface:
                     for key,sub_value in value.items():
                         for next_key,deep_value in sub_value.items():
-                            if "172.16." in deep_value['ip_address']:
-                                parsed_ping = self.device.parse(f"ping 1.1.1.1 source { interface } count 5")
-                                self.ping_1_1_1_1_results[self.device.alias][interface] = parsed_ping
+                            parsed_ping = self.device.parse(f"ping 1.1.1.1 source { interface } count 5")
+                            self.ping_1_1_1_1_results[self.device.alias][interface] = parsed_ping
                 else: 
-                    if "172.16." in value['ip_address']:
-                        parsed_ping = self.device.parse(f"ping 1.1.1.1 source { interface } count 5")
-                        self.ping_1_1_1_1_results[self.device.alias][interface] = parsed_ping
+                    parsed_ping = self.device.parse(f"ping 1.1.1.1 source { interface } count 5")
+                    self.ping_1_1_1_1_results[self.device.alias][interface] = parsed_ping
 
     @aetest.test
     def ping_8_8_8_8(self):
@@ -77,22 +77,28 @@ class PING_Public_IPs(aetest.Testcase):
         if self.device.os == "iosxe":
             interface_list = self.device.parse("show ip interface brief")
             for interface,value in interface_list['interface'].items():
-                if "172.16.252" in value['ip_address']:
+                try:
                     parsed_ping = self.device.parse(f"ping 8.8.8.8 source { interface } repeat { number_of_pings }")
                     self.ping_8_8_8_8_results[self.device.alias][interface] = parsed_ping
+                except:
+                    log.info(f"The Interface { interface } cannot ping 8.8.8.8")
         elif self.device.os == "nxos":
             interface_list = self.device.parse("show ip interface brief")
             for interface,value in interface_list['interface'].items():
                 if 'Vlan' in interface:
                     for key,sub_value in value.items():
                         for next_key,deep_value in sub_value.items():
-                            if "172.16." in deep_value['ip_address']:
+                            try:
                                 parsed_ping = self.device.parse(f"ping 8.8.8.8 source { interface } count 5")
                                 self.ping_8_8_8_8_results[self.device.alias][interface] = parsed_ping
+                            except:
+                                log.inf(f"The interface { interface } cannot ping 8.8.8.8")
                 else: 
-                    if "172.16." in value['ip_address']:
+                    try:
                         parsed_ping = self.device.parse(f"ping 8.8.8.8 source { interface } count 5")
                         self.ping_8_8_8_8_results[self.device.alias][interface] = parsed_ping
+                    except:
+                        log.info(f"The interface { interface } cannot ping 8.8.8.8")
 
     @aetest.test
     def create_files(self):
@@ -130,10 +136,10 @@ class PING_Public_IPs(aetest.Testcase):
                             headers=['Device', 'Interface', 'Success Rate Percentage', 'Passed/Failed'],
                             tablefmt='orgtbl'))
         # should we pass or fail?
-        if self.failed_1_1_1_1_success_rate:
-            self.failed(f'{ self.device } Has An Interface That Had Less Than 100% PING against 172.16.101.11')
+        if self.no_ping_response_1_1_1_1:
+            self.passed(f'{ self.device } Can NOT PING 1.1.1.1')
         else:
-            self.passed(f'All Interfaces on { self.device } Had 100% PING against 172.16.101.11')
+            self.failed(f'{ self.device } *CAN* PING 1.1.1.1')
 
     @aetest.test
     def test_8_8_8_8_success_rate_percentage(self):
@@ -162,235 +168,10 @@ class PING_Public_IPs(aetest.Testcase):
                             headers=['Device', 'Interface', 'Success Rate Percentage', 'Passed/Failed'],
                             tablefmt='orgtbl'))
         # should we pass or fail?
-        if self.failed_8_8_8_8_success_rate:
-            self.failed(f'{ self.device } Has An Interface That Had Less than 100% PING against 172.16.102.11')
-        else:
-            self.passed(f'All Interfaces on { self.device } Had 100% PING Success against 172.16.102.11')
-
-    @aetest.test
-    def test_1_1_1_1_min_ms(self):
-        # Test for ping minimum ms
-        self.failed_min_ms={}
-        if self.no_ping_response_1_1_1_1:
-            log.info("PING Failed - No Minumum MS to Measure")
-        else:
-            ping_min_ms_threshold = 5
-            table_data = []
-            for interface,value in self.ping_1_1_1_1_results[self.device.alias].items():
-                table_row = []
-                if value['ping']['statistics']['round_trip']['min_ms'] <= ping_min_ms_threshold:
-                    table_row.append(self.device.alias)
-                    table_row.append(interface)
-                    table_row.append(ping_min_ms_threshold)
-                    table_row.append(value['ping']['statistics']['round_trip']['min_ms'])
-                    table_row.append('Passed')
-                else:
-                    table_row.append(self.device.alias)
-                    table_row.append(interface)
-                    table_row.append(ping_min_ms_threshold)                
-                    table_row.append(value['ping']['statistics']['round_trip']['min_ms'])                
-                    table_row.append('Failed')
-                    self.failed_min_ms = value['ping']['statistics']['round_trip']['min_ms']
-                table_data.append(table_row)
-                # display the table
-            log.info(tabulate(table_data,
-                                headers=['Device', 'Interface', 'Minimum MS Threshold', 'Actual Minimum MS', 'Passed/Failed'],
-                                tablefmt='orgtbl'))
-        # should we pass or fail?
-        if self.failed_min_ms:
-            self.failed(f'{ self.device } Has An Interface PING to 172.16.101.11 above the minimum millisecond threshold')
-        elif self.no_ping_response_1_1_1_1:
-            self.failed("There were no responses to PING - Unable to test minimum millisecond threshold")
-        else:
-            self.passed(f'All Interfaces on { self.device } PING 172.16.101.11 within the minimum millisecond threshold')
-
-    @aetest.test
-    def test_8_8_8_8_min_ms(self):
-        # Test for ping minimum ms
-        self.failed_min_ms={}
         if self.no_ping_response_8_8_8_8:
-            log.info("PING Failed - No Minumum MS to Measure")
-        else:        
-            ping_min_ms_threshold = 5
-            table_data = []
-            for interface,value in self.ping_8_8_8_8_results[self.device.alias].items():
-                table_row = []
-                if value['ping']['statistics']['round_trip']['min_ms'] <= ping_min_ms_threshold:
-                    table_row.append(self.device.alias)
-                    table_row.append(interface)
-                    table_row.append(ping_min_ms_threshold)                
-                    table_row.append(value['ping']['statistics']['round_trip']['min_ms'])
-                    table_row.append('Passed')
-                else:
-                    table_row.append(self.device.alias)
-                    table_row.append(interface)
-                    table_row.append(ping_min_ms_threshold)                
-                    table_row.append(value['ping']['statistics']['round_trip']['min_ms'])                
-                    table_row.append('Failed')
-                    self.failed_min_ms = value['ping']['statistics']['round_trip']['min_ms']
-                table_data.append(table_row)
-                # display the table
-            log.info(tabulate(table_data,
-                                headers=['Device', 'Interface', 'Minimum MS Threshold', 'Actual Minimum MS', 'Passed/Failed'],
-                                tablefmt='orgtbl'))
-        # should we pass or fail?
-        if self.failed_min_ms:
-            self.failed(f'{ self.device } Has An Interface PING to 172.16.102.11 above the minimum millisecond threshold')
-        elif self.no_ping_response_8_8_8_8:
-            self.failed("There were no responses to PING - Unable to test minimum millisecond threshold")            
+            self.passed(f'{ self.device } Can NOT PING 8.8.8.8')
         else:
-            self.passed(f'All Interfaces on { self.device } PING 172.16.102.11 within the minimum millisecond threshold')
-
-    @aetest.test
-    def test_1_1_1_1_max_ms(self):
-        # Test for ping minimum ms
-        self.failed_max_ms={}
-        if self.no_ping_response_1_1_1_1:
-            log.info("PING Failed - No Maximum MS to Measure")
-        else:        
-            ping_max_ms_threshold = 10
-            self.failed_max_ms={}
-            table_data = []
-            for interface,value in self.ping_1_1_1_1_results[self.device.alias].items():
-                table_row = []
-                if value['ping']['statistics']['round_trip']['max_ms'] <= ping_max_ms_threshold:
-                    table_row.append(self.device.alias)
-                    table_row.append(interface)
-                    table_row.append(ping_max_ms_threshold)
-                    table_row.append(value['ping']['statistics']['round_trip']['max_ms'])
-                    table_row.append('Passed')
-                else:
-                    table_row.append(self.device.alias)
-                    table_row.append(interface)
-                    table_row.append(ping_max_ms_threshold)                
-                    table_row.append(value['ping']['statistics']['round_trip']['max_ms'])                
-                    table_row.append('Failed')
-                    self.failed_max_ms = value['ping']['statistics']['round_trip']['max_ms']
-                table_data.append(table_row)
-                # display the table
-            log.info(tabulate(table_data,
-                                headers=['Device', 'Interface', 'Maximum MS Threshold', 'Actual Maximum MS', 'Passed/Failed'],
-                                tablefmt='orgtbl'))
-        # should we pass or fail?
-        if self.failed_max_ms:
-            self.failed(f'{ self.device } Has An Interface PING to 172.16.101.11 above the maximum millisecond threshold')
-        elif self.no_ping_response_1_1_1_1:
-            self.failed("There were no responses to PING - Unable to test maximum millisecond threshold")            
-        else:
-            self.passed(f'All Interfaces on { self.device } PING 172.16.101.11 within the maximum millisecond threshold')
-
-    @aetest.test
-    def test_8_8_8_8_max_ms(self):
-        # Test for ping minimum ms
-        self.failed_max_ms={}
-        if self.no_ping_response_8_8_8_8:
-            log.info("PING Failed - No Maximum MS to Measure")
-        else:        
-            ping_max_ms_threshold = 10
-            self.failed_max_ms={}
-            table_data = []
-            for interface,value in self.ping_8_8_8_8_results[self.device.alias].items():
-                table_row = []
-                if value['ping']['statistics']['round_trip']['max_ms'] <= ping_max_ms_threshold:
-                    table_row.append(self.device.alias)
-                    table_row.append(interface)
-                    table_row.append(ping_max_ms_threshold)                
-                    table_row.append(value['ping']['statistics']['round_trip']['max_ms'])
-                    table_row.append('Passed')
-                else:
-                    table_row.append(self.device.alias)
-                    table_row.append(interface)
-                    table_row.append(ping_max_ms_threshold)                
-                    table_row.append(value['ping']['statistics']['round_trip']['max_ms'])                
-                    table_row.append('Failed')
-                    self.failed_max_ms = value['ping']['statistics']['round_trip']['max_ms']
-                table_data.append(table_row)
-                # display the table
-            log.info(tabulate(table_data,
-                                headers=['Device', 'Interface', 'Maximum MS Threshold', 'Actual Maximum MS', 'Passed/Failed'],
-                                tablefmt='orgtbl'))
-        # should we pass or fail?
-        if self.failed_max_ms:
-            self.failed(f'{ self.device } Has An Interface PING to 172.16.102.11 above the maximum millisecond threshold')
-        elif self.no_ping_response_8_8_8_8:
-            self.failed("There were no responses to PING - Unable to test maximum millisecond threshold")            
-        else:
-            self.passed(f'All Interfaces on { self.device } PING 172.16.102.11 within the maximum millisecond threshold')
-
-    @aetest.test
-    def test_1_1_1_1_avg_ms(self):
-        # Test for ping minimum ms
-        self.failed_avg_ms={}
-        if self.no_ping_response_1_1_1_1:
-            log.info("PING Failed - No Average MS to Measure")
-        else:        
-            ping_avg_ms_threshold = 7
-            self.failed_avg_ms={}
-            table_data = []
-            for interface,value in self.ping_1_1_1_1_results[self.device.alias].items():
-                table_row = []
-                if value['ping']['statistics']['round_trip']['avg_ms'] <= ping_avg_ms_threshold:
-                    table_row.append(self.device.alias)
-                    table_row.append(interface)
-                    table_row.append(ping_avg_ms_threshold)
-                    table_row.append(value['ping']['statistics']['round_trip']['avg_ms'])
-                    table_row.append('Passed')
-                else:
-                    table_row.append(self.device.alias)
-                    table_row.append(interface)
-                    table_row.append(ping_avg_ms_threshold)                
-                    table_row.append(value['ping']['statistics']['round_trip']['avg_ms'])                
-                    table_row.append('Failed')
-                    self.failed_avg_ms = value['ping']['statistics']['round_trip']['avg_ms']
-                table_data.append(table_row)
-                # display the table
-            log.info(tabulate(table_data,
-                                headers=['Device', 'Interface', 'Average MS Threshold', 'Actual Average MS', 'Passed/Failed'],
-                                tablefmt='orgtbl'))
-        # should we pass or fail?
-        if self.failed_avg_ms:
-            self.failed(f'{ self.device } Has An Interface PING to 172.16.101.11 above the average millisecond threshold')
-        elif self.no_ping_response_1_1_1_1:
-            self.failed("There were no responses to PING - Unable to test maximum millisecond threshold")            
-        else:
-            self.passed(f'All Interfaces on { self.device } PING 172.16.101.11 within the average millisecond threshold')
-
-    @aetest.test
-    def test_8_8_8_8_avg_ms(self):
-        # Test for ping minimum ms
-        self.failed_avg_ms={}
-        if self.no_ping_response_8_8_8_8:
-            log.info("PING Failed - No Average MS to Measure")
-        else:        
-            ping_avg_ms_threshold = 7
-            table_data = []
-            for interface,value in self.ping_8_8_8_8_results[self.device.alias].items():
-                table_row = []
-                if value['ping']['statistics']['round_trip']['avg_ms'] <= ping_avg_ms_threshold:
-                    table_row.append(self.device.alias)
-                    table_row.append(interface)
-                    table_row.append(ping_avg_ms_threshold)                
-                    table_row.append(value['ping']['statistics']['round_trip']['avg_ms'])
-                    table_row.append('Passed')
-                else:
-                    table_row.append(self.device.alias)
-                    table_row.append(interface)
-                    table_row.append(ping_avg_ms_threshold)                
-                    table_row.append(value['ping']['statistics']['round_trip']['avg_ms'])                
-                    table_row.append('Failed')
-                    self.failed_avg_ms = value['ping']['statistics']['round_trip']['avg_ms']
-                table_data.append(table_row)
-                # display the table
-            log.info(tabulate(table_data,
-                                headers=['Device', 'Interface', 'Average MS Threshold', 'Actual Average MS', 'Passed/Failed'],
-                                tablefmt='orgtbl'))
-        # should we pass or fail?
-        if self.failed_avg_ms:
-            self.failed(f'{ self.device } Has An Interface PING to 172.16.102.11 above the average millisecond threshold')
-        elif self.no_ping_response_8_8_8_8:
-            self.failed("There were no responses to PING - Unable to test average millisecond threshold")            
-        else:
-            self.passed(f'All Interfaces on { self.device } PING 172.16.102.11 within the average millisecond threshold')
+            self.failed(f'{ self.device } *CAN* PING 8.8.8.8')
 
 # ----------------
 # Test Case #2 - PING the 2 Linux Hosts
