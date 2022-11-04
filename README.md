@@ -1,3 +1,5 @@
+[![published](https://static.production.devnetcloud.com/codeexchange/assets/images/devnet-published.svg)](https://developer.cisco.com/codeexchange/github/repo/automateyournetwork/pyats_ping_tests)
+
 # pyats_ping_tests
 A connectivity test starter kit for pyATS
 
