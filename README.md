@@ -31,42 +31,11 @@ https://devnetsandbox.cisco.com/RM/Diagram/Index/45100600-b413-4471-b28e-b014eb8
 
 ### Connect to VPN 
 ### Wait for CML to fully initialize 
-
-## Enable CDP on all devices and interfaces
-```console
-ssh 10.10.20.175
-login as: cisco
-cisco@10.10.20.175's password: cisco
-dist-rtr01# conf t
-dist-rtr01(config)# cdp run
-dist-rtr01(config)# int range gi1-6
-dist-rtr01(config-if-range)# cdp enable
-
-ssh 10.10.20.176
-login as: cisco
-cisco@10.10.20.176's password: cisco
-dist-rtr02# conf t
-dist-rtr02(config)# cdp run
-dist-rtr02(config)# int range gi1-6
-dist-rtr02(config-if-range)# cdp enable
-
-ssh 10.10.20.177
-login as: cisco
-password: cisco
-dist-sw01# conf t
-dist-sw01(config)# cdp enable
-dist-sw01(config)# int eth1/3-4
-dist-sw01(config-if-range)# cdp enable
-
-ssh 10.10.20.178
-login as: cisco
-password: cisco
-dist-sw02# conf t
-dist-sw02(config)# cdp enable
-dist-sw02(config)# int eth1/3-4
-dist-sw02(config-if-range)# cdp enable
-```
-
+Please confirm you can SSH to the following devices before running the pyATS job:
+10.10.20.175
+10.10.20.176
+10.10.20.177
+10.10.20.178
 ## Run the pyATS Job 
 (ping_test) pyats_ping_tests $ pyats run job pyats_ping_tests_job.py
 

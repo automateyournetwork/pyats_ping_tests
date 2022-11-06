@@ -1,4 +1,5 @@
 import json
+import time
 import logging
 from pyats import aetest
 from pyats.log.utils import banner
@@ -22,15 +23,53 @@ class common_setup(aetest.CommonSetup):
     def connect_to_devices(self, testbed):
         """Connect to all the devices"""
         testbed.connect(log_stdout=False)
+
 # ----------------
-# Mark the loop for Input Discards
+# Mark the loop for each testcase to run on all devices in the testbed
 # ----------------
     @aetest.subsection
     def loop_mark(self, testbed):
+        aetest.loop.mark(Enable_CDP, device_name=testbed.devices)
         aetest.loop.mark(PING_Public_IPs, device_name=testbed.devices)
         aetest.loop.mark(PING_Linux_Hosts, device_name=testbed.devices)
         aetest.loop.mark(PING_CDP_Neighbors, device_name=testbed.devices)
 
+# ----------------
+# Enable CDP
+# ----------------
+class Enable_CDP(aetest.Testcase):
+    """Try to PING CDP Neighbors from the Interface they are discovered on"""
+
+    @aetest.test
+    def setup(self, testbed, device_name):
+        """ Testcase Setup section """
+        # connect to device
+        self.device = testbed.devices[device_name]
+        # Loop over devices in tested for testing
+
+    @aetest.test
+    def enable_CDP_globally(self):
+        if self.device.os == "iosxe":
+            self.device.configure("cdp run")
+        elif self.device.os == "nxos":
+            self.device.configure("cdp enable")
+
+    @aetest.test
+    def enable_CDP_interfaces(self):
+        interfaces = self.device.parse("show ip interface brief")
+        for interface in interfaces['interface'].items():
+            if self.device.os == "iosxe":
+                if "Gigabit" in interface:
+                    self.device.configure(f""" interface { interface }
+                    cdp enable
+                    """)
+            elif self.device.os == "nxos":
+                if "Ethernet" in interface:
+                    self.device.configure(f""" interface { interface }
+                    cdp enable
+                    """)
+        time.sleep(15)
+    
 # ----------------
 # Test Case #1 - PING public IP addresses
 # ----------------
