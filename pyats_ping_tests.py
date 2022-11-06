@@ -38,7 +38,7 @@ class common_setup(aetest.CommonSetup):
 # Enable CDP
 # ----------------
 class Enable_CDP(aetest.Testcase):
-    """Try to PING CDP Neighbors from the Interface they are discovered on"""
+    """Enable CDP On all Devices and Physical Interfaces"""
 
     @aetest.test
     def setup(self, testbed, device_name):
@@ -74,14 +74,13 @@ class Enable_CDP(aetest.Testcase):
 # Test Case #1 - PING public IP addresses
 # ----------------
 class PING_Public_IPs(aetest.Testcase):
-    """Try to PING CDP Neighbors from the Interface they are discovered on"""
+    """Try to PING Public IP Addresses"""
 
     @aetest.test
     def setup(self, testbed, device_name):
         """ Testcase Setup section """
         # connect to device
         self.device = testbed.devices[device_name]
-        # Loop over devices in tested for testing
     
     @aetest.test
     def ping_1_1_1_1(self):
@@ -158,17 +157,17 @@ class PING_Public_IPs(aetest.Testcase):
             table_row = []
             if value['ping']['statistics']['success_rate_percent'] == 0:
                 self.no_ping_response_1_1_1_1 = True            
-            if value['ping']['statistics']['success_rate_percent'] == 100.0:
+            if value['ping']['statistics']['success_rate_percent'] > 0:
                 table_row.append(self.device.alias)
                 table_row.append(interface)
                 table_row.append(value['ping']['statistics']['success_rate_percent'])
-                table_row.append('Passed')
+                table_row.append('Failed')
+                self.failed_1_1_1_1_success_rate = "Failed"
             else:
                 table_row.append(self.device.alias)
                 table_row.append(interface)
                 table_row.append(value['ping']['statistics']['success_rate_percent'])                
-                table_row.append('Failed')
-                self.failed_1_1_1_1_success_rate = "Failed"
+                table_row.append('Passed')
             table_data.append(table_row)
             # display the table
         log.info(tabulate(table_data,
@@ -190,17 +189,17 @@ class PING_Public_IPs(aetest.Testcase):
             table_row = []
             if value['ping']['statistics']['success_rate_percent'] == 0:
                 self.no_ping_response_8_8_8_8 = True
-            if value['ping']['statistics']['success_rate_percent'] == 100.0:
+            if value['ping']['statistics']['success_rate_percent'] > 0:
                 table_row.append(self.device.alias)
                 table_row.append(interface)
                 table_row.append(value['ping']['statistics']['success_rate_percent'])
-                table_row.append('Passed')
+                table_row.append('Failed')
+                self.failed_8_8_8_8_success_rate = "Failed"
             else:
                 table_row.append(self.device.alias)
                 table_row.append(interface)
                 table_row.append(value['ping']['statistics']['success_rate_percent'])                
-                table_row.append('Failed')
-                self.failed_8_8_8_8_success_rate = "Failed"
+                table_row.append('Passed')
             table_data.append(table_row)
             # display the table
         log.info(tabulate(table_data,
@@ -233,7 +232,7 @@ class PING_Linux_Hosts(aetest.Testcase):
         if self.device.os == "iosxe":
             interface_list = self.device.parse("show ip interface brief")
             for interface,value in interface_list['interface'].items():
-                if "172.16.252" in value['ip_address']:
+                if "172.16." in value['ip_address']:
                     parsed_ping = self.device.parse(f"ping 172.16.101.11 source { interface } repeat { number_of_pings }")
                     self.ping_172_16_101_11_results[self.device.alias][interface] = parsed_ping
         elif self.device.os == "nxos":
@@ -613,9 +612,12 @@ class PING_CDP_Neighbors(aetest.Testcase):
     def test_CDP_Neighbor_ping_success_rate_percentage(self):
         # Test for ping success rate
         self.failed_success_rate={}
+        self.no_ping_response_CDP_Neighbor = False
         table_data = []
         for interface,value in self.ping_cdp_neighbors_results[self.device.alias].items():
             table_row = []
+            if value['ping']['statistics']['success_rate_percent'] == 0:
+                self.no_ping_response_CDP_Neighbor = True
             if value['ping']['statistics']['success_rate_percent'] == 100.0:
                 table_row.append(self.device.alias)
                 table_row.append(interface)
@@ -646,30 +648,35 @@ class PING_CDP_Neighbors(aetest.Testcase):
         ping_min_ms_threshold = 2
         self.failed_success_rate={}
         table_data = []
-        for interface,value in self.ping_cdp_neighbors_results[self.device.alias].items():
-            table_row = []
-            if value['ping']['statistics']['round_trip']['min_ms'] <= ping_min_ms_threshold:
-                table_row.append(self.device.alias)
-                table_row.append(interface)
-                table_row.append(value['ping']['address'])
-                table_row.append(ping_min_ms_threshold)
-                table_row.append(value['ping']['statistics']['round_trip']['min_ms'])
-                table_row.append('Passed')
-            else:
-                table_row.append(self.device.alias)
-                table_row.append(interface)
-                table_row.append(value['ping']['address'])
-                table_row.append(ping_min_ms_threshold)
-                table_row.append(value['ping']['statistics']['round_trip']['min_ms'])               
-                table_row.append('Failed')
-                self.failed_success_rate = value['ping']['statistics']['round_trip']['min_ms']
-            table_data.append(table_row)
-            # display the table
+        if self.no_ping_response_CDP_Neighbor:
+            log.info("PING Failed - No Minumum MS to Measure")
+        else:
+            for interface,value in self.ping_cdp_neighbors_results[self.device.alias].items():
+                table_row = []
+                if value['ping']['statistics']['round_trip']['min_ms'] <= ping_min_ms_threshold:
+                    table_row.append(self.device.alias)
+                    table_row.append(interface)
+                    table_row.append(value['ping']['address'])
+                    table_row.append(ping_min_ms_threshold)
+                    table_row.append(value['ping']['statistics']['round_trip']['min_ms'])
+                    table_row.append('Passed')
+                else:
+                    table_row.append(self.device.alias)
+                    table_row.append(interface)
+                    table_row.append(value['ping']['address'])
+                    table_row.append(ping_min_ms_threshold)
+                    table_row.append(value['ping']['statistics']['round_trip']['min_ms'])               
+                    table_row.append('Failed')
+                    self.failed_success_rate = value['ping']['statistics']['round_trip']['min_ms']
+                table_data.append(table_row)
+                # display the table
         log.info(tabulate(table_data,
                             headers=['Device', 'Neighbor', 'Destination', 'Minimum MS Threshold', 'Actual Minimum MS', 'Passed/Failed'],
                             tablefmt='orgtbl'))
         # should we pass or fail?
-        if self.failed_success_rate:
+        if self.no_ping_response_CDP_Neighbor:
+            self.failed("There was no responses to PING from an interface - Unable to test minimum millisecond response")
+        elif self.failed_success_rate:
             self.failed(f'{ self.device } Has An Interface That Had above the minimum millisecond threshold PING Aginst CDP Neighbor')
         else:
             self.passed(f'All Interfaces on { self.device } within the minimum millisecond threshold PING Against CDP Neighbor')
@@ -680,30 +687,35 @@ class PING_CDP_Neighbors(aetest.Testcase):
         ping_max_ms_threshold = 4
         self.failed_success_rate={}
         table_data = []
-        for interface,value in self.ping_cdp_neighbors_results[self.device.alias].items():
-            table_row = []
-            if value['ping']['statistics']['round_trip']['max_ms'] <= ping_max_ms_threshold:
-                table_row.append(self.device.alias)
-                table_row.append(interface)
-                table_row.append(value['ping']['address'])
-                table_row.append(ping_max_ms_threshold)
-                table_row.append(value['ping']['statistics']['round_trip']['max_ms'])
-                table_row.append('Passed')
-            else:
-                table_row.append(self.device.alias)
-                table_row.append(interface)
-                table_row.append(value['ping']['address'])
-                table_row.append(ping_max_ms_threshold)
-                table_row.append(value['ping']['statistics']['round_trip']['max_ms'])               
-                table_row.append('Failed')
-                self.failed_success_rate = value['ping']['statistics']['round_trip']['max_ms']
-            table_data.append(table_row)
-            # display the table
+        if self.no_ping_response_CDP_Neighbor:
+            log.info("PING Failed - No Minumum MS to Measure")
+        else:        
+            for interface,value in self.ping_cdp_neighbors_results[self.device.alias].items():
+                table_row = []
+                if value['ping']['statistics']['round_trip']['max_ms'] <= ping_max_ms_threshold:
+                    table_row.append(self.device.alias)
+                    table_row.append(interface)
+                    table_row.append(value['ping']['address'])
+                    table_row.append(ping_max_ms_threshold)
+                    table_row.append(value['ping']['statistics']['round_trip']['max_ms'])
+                    table_row.append('Passed')
+                else:
+                    table_row.append(self.device.alias)
+                    table_row.append(interface)
+                    table_row.append(value['ping']['address'])
+                    table_row.append(ping_max_ms_threshold)
+                    table_row.append(value['ping']['statistics']['round_trip']['max_ms'])               
+                    table_row.append('Failed')
+                    self.failed_success_rate = value['ping']['statistics']['round_trip']['max_ms']
+                table_data.append(table_row)
+                # display the table
         log.info(tabulate(table_data,
                             headers=['Device', 'Neighbor', 'Destination', 'Maximum MS Threshold', 'Actual Maximum MS', 'Passed/Failed'],
                             tablefmt='orgtbl'))
         # should we pass or fail?
-        if self.failed_success_rate:
+        if self.no_ping_response_CDP_Neighbor:
+            self.failed("There was no responses to PING from an interface - Unable to test maxmimum millisecond response")        
+        elif self.failed_success_rate:
             self.failed(f'{ self.device } Has An Interface That Had above the maximum millisecond threshold PING Aginst CDP Neighbor')
         else:
             self.passed(f'All Interfaces on { self.device } within the maximum millisecond threshold PING Against CDP Neighbor')
@@ -714,30 +726,35 @@ class PING_CDP_Neighbors(aetest.Testcase):
         ping_avg_ms_threshold = 3
         self.failed_success_rate={}
         table_data = []
-        for interface,value in self.ping_cdp_neighbors_results[self.device.alias].items():
-            table_row = []
-            if value['ping']['statistics']['round_trip']['avg_ms'] <= ping_avg_ms_threshold:
-                table_row.append(self.device.alias)
-                table_row.append(interface)
-                table_row.append(value['ping']['address'])
-                table_row.append(ping_avg_ms_threshold)
-                table_row.append(value['ping']['statistics']['round_trip']['avg_ms'])
-                table_row.append('Passed')
-            else:
-                table_row.append(self.device.alias)
-                table_row.append(interface)
-                table_row.append(value['ping']['address'])
-                table_row.append(ping_avg_ms_threshold)
-                table_row.append(value['ping']['statistics']['round_trip']['avg_ms'])               
-                table_row.append('Failed')
-                self.failed_success_rate = value['ping']['statistics']['round_trip']['avg_ms']
-            table_data.append(table_row)
-            # display the table
+        if self.no_ping_response_CDP_Neighbor:
+            log.info("PING Failed - No Minumum MS to Measure")
+        else:        
+            for interface,value in self.ping_cdp_neighbors_results[self.device.alias].items():
+                table_row = []
+                if value['ping']['statistics']['round_trip']['avg_ms'] <= ping_avg_ms_threshold:
+                    table_row.append(self.device.alias)
+                    table_row.append(interface)
+                    table_row.append(value['ping']['address'])
+                    table_row.append(ping_avg_ms_threshold)
+                    table_row.append(value['ping']['statistics']['round_trip']['avg_ms'])
+                    table_row.append('Passed')
+                else:
+                    table_row.append(self.device.alias)
+                    table_row.append(interface)
+                    table_row.append(value['ping']['address'])
+                    table_row.append(ping_avg_ms_threshold)
+                    table_row.append(value['ping']['statistics']['round_trip']['avg_ms'])               
+                    table_row.append('Failed')
+                    self.failed_success_rate = value['ping']['statistics']['round_trip']['avg_ms']
+                table_data.append(table_row)
+                # display the table
         log.info(tabulate(table_data,
                             headers=['Device', 'Neighbor', 'Destination', 'Average MS Threshold', 'Actual Average MS', 'Passed/Failed'],
                             tablefmt='orgtbl'))
         # should we pass or fail?
-        if self.failed_success_rate:
+        if self.no_ping_response_CDP_Neighbor:
+            self.failed("There was no responses to PING from an interface - Unable to test average millisecond response")        
+        elif self.failed_success_rate:
             self.failed(f'{ self.device } Has An Interface That Had above the average millisecond threshold PING Aginst CDP Neighbor')
         else:
             self.passed(f'All Interfaces on { self.device } within the average millisecond threshold PING Against CDP Neighbor')
@@ -750,6 +767,19 @@ class PING_CDP_Neighbors(aetest.Testcase):
 
         with open(f'JSON/{self.device.alias}_CDP_Neighbor_PING_Test.json', 'w') as f:
             f.write(json.dumps(self.ping_cdp_neighbors_results, indent=4, sort_keys=True))
+
+# ----------------
+# AE Test Cleanup
+# ----------------
+class common_cleanup(aetest.CommonCleanup):
+    """Common Setup section"""
+# ----------------
+# Connected to devices
+# ----------------
+    @aetest.subsection
+    def disconnect_from_devices(self, testbed):
+        """Connect to all the devices"""
+        testbed.disconnect()
 
 # for running as its own executable
 if __name__ == '__main__':
